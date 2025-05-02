@@ -8,11 +8,11 @@ let ghostStrength = 0;
 let avgBrightness = 127;
 
 function setup() {
-  createCanvas(windowWidth, windowHeight);
+  createCanvas(windowWidth, windowHeight); // Adjust canvas to full screen
   pixelDensity(1);
 
   capture = createCapture(VIDEO);
-  capture.size(160, 120);
+  capture.size(320, 240); // Keep low resolution for performance
   capture.hide();
 
   mic = new p5.AudioIn();
@@ -28,6 +28,7 @@ function setup() {
     faceapi.detect(gotResults);
   });
 
+  // Create a particle for every pixel in the webcam feed
   for (let y = 0; y < capture.height; y++) {
     for (let x = 0; x < capture.width; x++) {
       particles.push(new GhostPixel(x, y));
@@ -45,26 +46,28 @@ function gotResults(err, result) {
 }
 
 function draw() {
-  background(0, 15);
+  background(0, 15); // dreamy trail
+
   capture.loadPixels();
   avgBrightness = getAverageBrightness();
 
   let vol = mic.getLevel();
   let eyesClosed = areEyesClosed();
 
-  // No more smoothing — instant toggle
-  ghostStrength = eyesClosed ? 1 : 0;
+  // Smooth transition for ghost visibility
+  ghostStrength = lerp(ghostStrength, eyesClosed ? 1 : 0, 0.05);
 
   for (let p of particles) {
     p.update(vol);
     p.show(ghostStrength);
   }
 
+  // Subtle caption
   fill(255, ghostStrength * 80);
   noStroke();
   textSize(16);
   textAlign(CENTER);
-  text("I'll appear only if you have your eyes shut", width / 2, height - 20);
+  text("🫥 Ghost only appears when you close your eyes", width / 2, height - 20);
 }
 
 function areEyesClosed() {
@@ -103,8 +106,8 @@ class GhostPixel {
   constructor(x, y) {
     this.vidX = x;
     this.vidY = y;
-    this.baseX = x * 4;
-    this.baseY = y * 4;
+    this.baseX = map(x, 0, capture.width, 0, width);  // Scale relative to full screen width
+    this.baseY = map(y, 0, capture.height, 0, height); // Scale relative to full screen height
     this.x = this.baseX;
     this.y = this.baseY;
     this.r = random(1.5, 2.5);
@@ -119,18 +122,18 @@ class GhostPixel {
     const brightness = (r + g + b) / 3;
 
     if (brightness < avgBrightness + 10) {
-      this.alpha = 255;
+      this.alpha = lerp(this.alpha, 255, 0.1);
       this.x = lerp(this.x, this.baseX + random(-vol * 15, vol * 15), 0.15);
       this.y = lerp(this.y, this.baseY + random(-vol * 15, vol * 15), 0.15);
     } else {
-      this.alpha = 0;
+      this.alpha = lerp(this.alpha, 0, 0.05);
     }
   }
 
   show(strength) {
-    if (this.alpha > 5 && strength > 0.5) {
+    if (this.alpha > 5 && strength > 0.01) {
       noStroke();
-      fill(255, this.alpha);
+      fill(255, this.alpha * strength);
       ellipse(this.x, this.y, this.r);
     }
   }
